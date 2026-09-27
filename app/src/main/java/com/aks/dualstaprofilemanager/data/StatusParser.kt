@@ -9,6 +9,17 @@ data class WlanLinkStatus(
     val rxBitrate: String?,
     val txBitrate: String?
 ) {
+    val channel: Int?
+        get() = frequencyMhz?.let { freq ->
+            when (freq) {
+                2484 -> 14
+                in 2412..2472 -> (freq - 2407) / 5
+                in 5000..5900 -> (freq - 5000) / 5
+                in 5935..7125 -> if (freq == 5935) 2 else ((freq - 5950) / 5).coerceAtLeast(1)
+                else -> null
+            }
+        }
+
     val bandLabel: String?
         get() = frequencyMhz?.let { freq ->
             when (freq) {
@@ -18,11 +29,34 @@ data class WlanLinkStatus(
                 else -> null
             }
         }
+
+    val bandAndChannelLabel: String
+        get() {
+            val band = bandLabel ?: (frequencyMhz?.let { "$it MHz" } ?: "")
+            val ch = channel?.let { "CH $it" }
+            return when {
+                band.isNotEmpty() && ch != null -> "$band $ch"
+                band.isNotEmpty() -> band
+                ch != null -> ch
+                else -> ""
+            }
+        }
+
+    val wifiGeneration: String
+        get() {
+            val combined = "${rxBitrate ?: ""} ${txBitrate ?: ""}"
+            return ScanParser.determineWifiGeneration(
+                wifiStandard = null,
+                capabilities = null,
+                frequencyMhz = frequencyMhz,
+                bitrateInfo = combined
+            )
+        }
 }
 
 object StatusParser {
     fun parseIwLink(output: String): WlanLinkStatus {
-        if (output.contains("Not connected") || output.isBlank()) {
+        if (output.contains("Not connected", ignoreCase = true) || output.isBlank()) {
             return WlanLinkStatus(false, null, null, null, null, null, null)
         }
 
@@ -35,34 +69,39 @@ object StatusParser {
 
         for (line in output.lines()) {
             val trimmed = line.trim()
+            val lower = trimmed.lowercase()
             when {
-                trimmed.startsWith("SSID:") -> {
-                    ssid = trimmed.substring(5).trim()
+                lower.startsWith("ssid:") -> {
+                    ssid = trimmed.substringAfter(":").trim()
                 }
-                trimmed.startsWith("Connected to") -> {
-                    val parts = trimmed.split(" ")
+                lower.startsWith("connected to") -> {
+                    val parts = trimmed.split(Regex("\\s+"))
                     if (parts.size >= 3) {
                         bssid = parts[2].lowercase()
                     }
                 }
-                trimmed.startsWith("freq:") -> {
-                    freq = trimmed.substring(5).trim().toIntOrNull()
+                lower.startsWith("freq:") -> {
+                    val freqStr = trimmed.substringAfter(":").trim()
+                    freq = freqStr.toIntOrNull() ?: freqStr.toFloatOrNull()?.toInt()
                 }
-                trimmed.startsWith("signal:") -> {
-                    val sigPart = trimmed.substring(7).trim().replace(" dBm", "").toIntOrNull()
+                lower.startsWith("signal:") -> {
+                    val sigPart = trimmed.substringAfter(":").trim().replace("dBm", "", ignoreCase = true).trim().toIntOrNull()
                     signal = sigPart
                 }
-                trimmed.startsWith("rx bitrate:") -> {
-                    rxBitrate = trimmed.substring(11).trim()
+                lower.startsWith("rx bitrate:") -> {
+                    rxBitrate = trimmed.substringAfter(":").trim()
                 }
-                trimmed.startsWith("tx bitrate:") -> {
-                    txBitrate = trimmed.substring(11).trim()
+                lower.startsWith("tx bitrate:") -> {
+                    txBitrate = trimmed.substringAfter(":").trim()
+                }
+                lower.startsWith("bitrate:") && txBitrate == null -> {
+                    txBitrate = trimmed.substringAfter(":").trim()
                 }
             }
         }
 
         return WlanLinkStatus(
-            isConnected = bssid != null,
+            isConnected = bssid != null || ssid != null,
             ssid = ssid,
             bssid = bssid,
             frequencyMhz = freq,

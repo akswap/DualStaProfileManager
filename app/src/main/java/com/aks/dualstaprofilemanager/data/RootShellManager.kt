@@ -81,6 +81,25 @@ object RootShellManager {
         return result.out.joinToString("\n")
     }
 
+    fun isInterfaceActive(interfaceName: String): Boolean {
+        val result = Shell.cmd("ip link show $interfaceName").exec()
+        if (!result.isSuccess) return false
+        val output = result.out.joinToString("\n")
+        return output.contains("state UP") || output.contains("<UP")
+    }
+
+    fun bringWlan1Up(): Pair<Boolean, String> {
+        if (isInterfaceActive("wlan2")) {
+            return Pair(false, "Cannot bring wlan1 up: wlan2 is currently active!")
+        }
+        val result = Shell.cmd("ip link set wlan1 up").exec()
+        return if (result.isSuccess) {
+            Pair(true, "wlan1 brought up successfully")
+        } else {
+            Pair(false, "Failed to bring wlan1 up: ${result.err.joinToString("\n")}")
+        }
+    }
+
     fun getHelperPid(): Int? {
         val result = Shell.cmd("cat $PID_PATH").exec()
         if (!result.isSuccess) return null

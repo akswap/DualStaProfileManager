@@ -9,6 +9,15 @@ data class WifiProfile(
     val security: String,
     val passphrase: String
 ) {
+    val channel: Int?
+        get() = when (frequencyMhz) {
+            2484 -> 14
+            in 2412..2472 -> (frequencyMhz - 2407) / 5
+            in 5000..5900 -> (frequencyMhz - 5000) / 5
+            in 5935..7125 -> if (frequencyMhz == 5935) 2 else ((frequencyMhz - 5950) / 5).coerceAtLeast(1)
+            else -> null
+        }
+
     val bandLabel: String
         get() = when (frequencyMhz) {
             in 2400..2500 -> "2.4 GHz"
@@ -16,6 +25,19 @@ data class WifiProfile(
             in 5925..7125 -> "6 GHz"
             else -> "Unknown"
         }
+
+    val bandAndChannelLabel: String
+        get() {
+            val ch = channel?.let { "CH $it" }
+            return if (ch != null) "$bandLabel $ch" else bandLabel
+        }
+
+    val wifiGeneration: String
+        get() = ScanParser.determineWifiGeneration(
+            wifiStandard = null,
+            capabilities = security,
+            frequencyMhz = frequencyMhz
+        )
 }
 
 object ConfigParser {
