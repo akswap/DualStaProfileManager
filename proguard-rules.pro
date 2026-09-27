@@ -1,0 +1,1 @@
+# R8 / ProGuard rules for Dual STA Profile Manager\n-keep class com.aks.dualstaprofilemanager.** { *; }\n-keep class com.topjohnwu.superuser.** { *; }
