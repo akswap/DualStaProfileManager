@@ -1,4 +1,4 @@
-# Dual STA (DUAL WiFi) Profile Manager
+# Dual STA (DUAL WiFi) Profile Manager & Required Tools
 
 Android application for managing secondary Wi-Fi STA profiles on a rooted POCO F7 (`onyx`) with the Magisk module `onyx_dualsta_overlay` (`1.3-configurable`). The app keeps the primary `wlan0` connection read-only and manages the secondary `wlan1` profile configuration through the installed module.
 
